@@ -1,0 +1,96 @@
+import { useMemo, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
+import { Archive, ArchiveX, Bell, ChevronDown, ChevronLeft, ChevronRight, FileText, Inbox, LayoutGrid, Mail, MailPlus, Menu, MoreHorizontal, PanelLeftClose, Search, Send, Settings, ShieldCheck, Sparkles, Star, Tag, Trash2, WandSparkles, X } from "lucide-react";
+import { demoMessages } from "./data/demoMessages";
+import type { DemoMessage, MailFolder } from "./types";
+
+type Page = "mail" | "general" | "appearance" | "accounts" | "ai" | "notifications";
+const folders: { id: MailFolder; label: string; icon: typeof Inbox; count?: number }[] = [
+  { id: "inbox", label: "Posteingang", icon: Inbox, count: 3 }, { id: "starred", label: "Favoriten", icon: Star },
+  { id: "important", label: "Wichtig", icon: Tag }, { id: "drafts", label: "Entwürfe", icon: FileText },
+  { id: "sent", label: "Gesendet", icon: Send }, { id: "archive", label: "Archiv", icon: Archive },
+  { id: "spam", label: "Spam", icon: ArchiveX }, { id: "trash", label: "Papierkorb", icon: Trash2 },
+];
+const settingsPages: { id: Page; label: string; icon: typeof Settings; subtitle: string }[] = [
+  { id: "general", label: "Allgemein", icon: Settings, subtitle: "Deine Smart Mail Erfahrung" },
+  { id: "appearance", label: "Darstellung", icon: LayoutGrid, subtitle: "Passe das Erscheinungsbild an" },
+  { id: "accounts", label: "Konten", icon: Mail, subtitle: "Verbundene E-Mail-Konten" },
+  { id: "ai", label: "Smart AI", icon: Sparkles, subtitle: "Deine KI-Einstellungen" },
+  { id: "notifications", label: "Benachrichtigungen", icon: Bell, subtitle: "Bleib auf dem Laufenden" },
+];
+
+export default function App() {
+  const [page, setPage] = useState<Page>("mail");
+  const [folder, setFolder] = useState<MailFolder>("inbox");
+  const [selectedId, setSelectedId] = useState("m1");
+  const [query, setQuery] = useState("");
+  const [collapsed, setCollapsed] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [mobileView, setMobileView] = useState<"list" | "message">("list");
+  const [aiOpen, setAiOpen] = useState(false);
+  const [compose, setCompose] = useState(false);
+  const [toggles, setToggles] = useState({ notifications: true, animations: true, blur: true, externalImages: false });
+  const selected = demoMessages.find((item) => item.id === selectedId) ?? demoMessages[0];
+  const visibleMessages = useMemo(() => demoMessages.filter((item) => {
+    const inFolder = folder === "starred" ? item.starred : folder === "important" ? item.important : item.folder === folder;
+    const search = `${item.sender} ${item.subject} ${item.preview}`.toLowerCase();
+    return inFolder && search.includes(query.toLowerCase());
+  }), [folder, query]);
+  const activeFolder = folders.find((item) => item.id === folder)?.label ?? "Posteingang";
+  const flip = (key: keyof typeof toggles) => setToggles((current) => ({ ...current, [key]: !current[key] }));
+
+  return <main className={`app-shell ${collapsed ? "sidebar-collapsed" : ""}`}>
+    <header className="titlebar"><button className="mobile-menu-button" onClick={() => setMobileMenuOpen(!mobileMenuOpen)} aria-label="Navigation öffnen"><Menu size={18} /></button><div className="titlebar-brand"><img className="brand-glyph" src={`${import.meta.env.BASE_URL}icons/icon-192.png`} alt="" /><span>Smart Mail</span><span className="titlebar-dot" /></div><div className="titlebar-center">Dein Postfach, in deinem Flow.</div></header>
+    <div className={`workspace ${mobileView === "message" ? "mobile-message" : ""}`}>
+      {mobileMenuOpen && <button className="mobile-scrim" onClick={() => setMobileMenuOpen(false)} aria-label="Navigation schließen" />}
+      <aside className={`sidebar glass-panel ${mobileMenuOpen ? "mobile-open" : ""}`}>
+        <div className="sidebar-top"><div className="account-switch"><div className="account-avatar">A</div><div className="account-meta"><strong>Alex Beispiel</strong><span>alex@smartmail.test</span></div><ChevronDown size={15} className="muted" /></div><button className="icon-button collapse-button" onClick={() => setCollapsed(!collapsed)} aria-label="Seitenleiste einklappen"><PanelLeftClose size={17} /></button></div>
+        <button className="compose-button" onClick={() => setCompose(true)}><MailPlus size={17} /><span>Neue Nachricht</span><kbd>N</kbd></button>
+        <div className="nav-label">POSTFACH</div><nav className="folder-nav">{folders.map(({ id, label, icon: Icon, count }) => <button key={id} className={`nav-item ${page === "mail" && folder === id ? "active" : ""}`} onClick={() => { setFolder(id); setPage("mail"); setMobileMenuOpen(false); setMobileView("list"); }}><Icon size={17} strokeWidth={1.75} /><span>{label}</span>{count && <small className="unread-count">{count}</small>}</button>)}</nav>
+        <div className="sidebar-rule" /><div className="nav-label">KONTO</div><button className="nav-item folder-special"><span className="folder-dot" /> <span>Persönlich</span><MoreHorizontal size={16} className="folder-more" /></button>
+        <div className="sidebar-spacer" /><div className="sidebar-bottom"><button className={`nav-item ${page !== "mail" ? "active" : ""}`} onClick={() => { setPage("general"); setMobileMenuOpen(false); }}><Settings size={17} /><span>Einstellungen</span></button><button className="nav-item" onClick={() => { setAiOpen(!aiOpen); setMobileMenuOpen(false); }}><Sparkles size={17} /><span>Smart AI</span><span className="beta-pill">BETA</span></button><div className="sidebar-footer"><div className="secure-dot"><ShieldCheck size={13} /></div><span>Deine Daten bleiben privat</span></div></div>
+      </aside>
+
+      {page === "mail" ? <>
+        <section className="mail-list glass-panel">
+          <div className="list-header"><div><div className="eyebrow">DEIN POSTFACH</div><h1>{activeFolder}</h1></div><button className="icon-button" aria-label="Weitere Optionen"><MoreHorizontal size={19} /></button></div>
+          <label className="search-field"><Search size={16} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Suchen …" /><kbd>⌘ K</kbd></label>
+          <div className="list-tools"><button className="filter-chip active">Alle <span>12</span></button><button className="filter-chip">Ungelesen <span>3</span></button><button className="tool-icon" aria-label="Filter"><ChevronDown size={15} /></button></div>
+          <div className="message-list">{visibleMessages.map((message) => <MessageRow key={message.id} message={message} active={message.id === selectedId} onClick={() => { setSelectedId(message.id); setMobileView("message"); }} />)}{visibleMessages.length === 0 && <div className="empty-state">Keine Nachrichten gefunden.</div>}</div>
+          <div className="list-footer"><span>1–{visibleMessages.length} von {folder === "inbox" ? 248 : visibleMessages.length}</span><button aria-label="Vorherige Seite"><ChevronLeft size={16} /></button><button aria-label="Nächste Seite"><ChevronRight size={16} /></button></div>
+        </section>
+        <section className="reading-pane glass-panel"><div className="message-toolbar"><div className="toolbar-group"><button className="icon-button mobile-back" aria-label="Zur Nachrichtenliste" onClick={() => setMobileView("list")}><ChevronLeft size={18} /></button><button className="icon-button" aria-label="Archivieren"><Archive size={17} /></button><button className="icon-button" aria-label="Löschen"><Trash2 size={17} /></button><span className="toolbar-divider" /><button className="icon-button" aria-label="Als ungelesen markieren"><Mail size={17} /></button></div><div className="toolbar-group"><button className="icon-button" aria-label="Weitere Optionen"><MoreHorizontal size={18} /></button></div></div>
+          <div className="message-content"><div className="message-kicker"><span className="demo-mark"><span /> DEMO-NACHRICHT</span><span className="message-date">Heute, {selected.time} Uhr</span></div><h2 className="message-subject">{selected.subject}</h2>
+            <div className="sender-card"><div className="sender-avatar" style={{ background: selected.color }}>{selected.initials}</div><div className="sender-details"><strong>{selected.sender}</strong><span>{selected.email}</span></div><button className="icon-button sender-more" aria-label="Absenderoptionen"><MoreHorizontal size={18} /></button></div>
+            <div className="recipient-line">An <strong>Alex Beispiel</strong> <ChevronDown size={13} /></div>
+            <div className="mail-body">{selected.body.map((paragraph, index) => <p key={index}>{paragraph.split("\n").map((line, lineIndex) => <span key={lineIndex}>{line}{lineIndex < paragraph.split("\n").length - 1 && <br />}</span>)}</p>)}</div>
+            {selected.attachment && <div className="attachment-card"><div className="attachment-icon"><FileText size={19} /></div><div><strong>{selected.attachment}</strong><span>PDF-Dokument · 2,4 MB</span></div><button className="icon-button" aria-label="Anhang herunterladen"><ChevronDown size={16} /></button></div>}
+            <div className="reply-actions"><button className="reply-button" onClick={() => setCompose(true)}><ChevronLeft size={15} className="reply-turn" /> Antworten</button><button className="forward-button" onClick={() => setCompose(true)}>Weiterleiten <ChevronRight size={15} /></button><button className="ai-suggest" onClick={() => setAiOpen(true)}><Sparkles size={15} /> Antwort vorschlagen</button></div>
+          </div>
+          <div className="reading-bottom"><span><ShieldCheck size={14} /> Geschützte Nachrichtenvorschau</span><button onClick={() => flip("externalImages")}>{toggles.externalImages ? "Externe Bilder geladen" : "Externe Bilder blockiert"}</button></div>
+        </section>
+      </> : <SettingsPage page={page} setPage={setPage} toggles={toggles} flip={flip} />}
+      <AnimatePresence>{aiOpen && <motion.aside className="ai-panel glass-panel" initial={{ opacity: 0, x: 24 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 24 }} transition={{ duration: 0.2 }}><div className="ai-head"><div className="ai-heading"><div className="ai-icon"><Sparkles size={17} /></div><div><strong>Smart AI</strong><span>Dein Schreibassistent</span></div></div><button className="icon-button" onClick={() => setAiOpen(false)} aria-label="Smart AI schließen"><X size={17} /></button></div><div className="ai-context"><span className="context-dot" /> Kontext aktiv <span>·</span> 1 Nachricht</div><div className="ai-welcome"><div className="ai-orb"><WandSparkles size={23} /></div><h3>Wie kann ich helfen?</h3><p>Ich habe den Kontext dieser Nachricht. Was möchtest du tun?</p></div><div className="ai-prompts"><button onClick={() => {}}>✦ &nbsp;Fasse diese E-Mail zusammen</button><button>↗ &nbsp;Schreibe eine freundliche Antwort</button><button>☷ &nbsp;Erkenne Aufgaben und Termine</button></div><div className="ai-chat-input"><input placeholder="Frag etwas zur E-Mail …" /><button aria-label="Senden"><Send size={16} /></button></div><div className="ai-privacy"><ShieldCheck size={13} /> Inhalte werden nur mit deiner Zustimmung geteilt.</div></motion.aside>}</AnimatePresence>
+    </div>
+    <div className="demo-banner"><span className="demo-banner-dot" /> DEMO-MODUS <span className="banner-separator">·</span> Beispieldaten, keine echten E-Mails</div>
+    {compose && <ComposeModal onClose={() => setCompose(false)} />}
+  </main>;
+}
+
+function MessageRow({ message, active, onClick }: { message: DemoMessage; active: boolean; onClick: () => void }) {
+  return <button onClick={onClick} className={`message-row ${active ? "selected" : ""} ${message.unread ? "unread" : ""}`}><div className="row-top"><span className="row-sender">{message.sender}</span><span className="row-time">{message.time}</span></div><div className="row-subject">{message.subject}</div><div className="row-preview">{message.preview}</div><div className="row-meta">{message.attachment && <span className="attachment-tag"><FileText size={12} /> Anhang</span>}{message.important && <span className="important-tag">Wichtig</span>}{message.starred && <Star size={13} className="star-icon" fill="currentColor" />}</div>{message.unread && <span className="row-unread-dot" />}</button>;
+}
+
+function SettingsPage({ page, setPage, toggles, flip }: { page: Page; setPage: (page: Page) => void; toggles: { notifications: boolean; animations: boolean; blur: boolean; externalImages: boolean }; flip: (key: keyof typeof toggles) => void }) {
+  const current = settingsPages.find((item) => item.id === page) ?? settingsPages[0];
+  return <section className="settings-pane glass-panel"><div className="settings-top"><div><div className="eyebrow">SMART MAIL</div><h1>Einstellungen</h1><p>Gestalte deinen Arbeitsplatz nach deinen Wünschen.</p></div></div><div className="settings-layout"><nav className="settings-nav">{settingsPages.map(({ id, label, icon: Icon }) => <button className={page === id ? "active" : ""} key={id} onClick={() => setPage(id)}><Icon size={16} />{label}</button>)}</nav><div className="settings-content"><div className="settings-section-head"><div className="settings-page-icon"><current.icon size={19} /></div><div><h2>{current.label}</h2><p>{current.subtitle}</p></div></div>
+    {page === "general" && <><div className="setting-group"><h3>Beim Start</h3><SettingSelect label="Startansicht" detail="Was du beim Öffnen von Smart Mail siehst" value="Posteingang" /><SettingToggle label="Zuletzt geöffnete Ansicht wiederherstellen" detail="Dort weitermachen, wo du aufgehört hast" checked={true} /></div><div className="setting-group"><h3>Bedienung</h3><SettingToggle label="Sanfte Animationen" detail="Flüssige Übergänge in der Oberfläche" checked={toggles.animations} onClick={() => flip("animations")} /><SettingToggle label="Bestätigung beim Löschen" detail="Vor dem endgültigen Entfernen nachfragen" checked={true} /></div></>}
+    {page === "appearance" && <><div className="setting-group"><h3>Farbschema</h3><div className="theme-options"><button className="theme-choice selected"><span className="theme-swatch dark-swatch" /> Dunkel <span className="checkmark">✓</span></button><button className="theme-choice"><span className="theme-swatch light-swatch" /> Hell</button><button className="theme-choice"><span className="theme-swatch system-swatch" /> System</button></div><SettingSelect label="Akzentfarbe" detail="Farbe für Hervorhebungen und Aktionen" value="Soft Violet" /></div><div className="setting-group"><h3>Oberfläche</h3><SettingToggle label="Glasunschärfe" detail="Sanfte Tiefenwirkung für Oberflächen" checked={toggles.blur} onClick={() => flip("blur")} /><SettingSelect label="Listendichte" detail="Abstand zwischen Nachrichten" value="Kompakt" /></div></>}
+    {page === "accounts" && <div className="setting-group"><h3>Deine Konten</h3><div className="account-setting-card"><div className="account-avatar large">A</div><div><strong>Alex Beispiel</strong><span>alex@smartmail.test</span></div><span className="demo-pill">DEMO</span><button className="subtle-button">Verwalten</button></div><button className="add-account"><MailPlus size={16} /> E-Mail-Konto hinzufügen <span>+</span></button><p className="coming-note">IMAP-/SMTP-Konten werden in einer späteren Phase verfügbar.</p></div>}
+    {page === "ai" && <><div className="setting-group"><h3>Anbieter</h3><div className="provider-choice"><div className="provider-mark">✳</div><div><strong>OpenAI</strong><span>Antworten, zusammenfassen und mehr</span></div><span className="coming-pill">BALD VERFÜGBAR</span></div><div className="provider-choice"><div className="provider-mark ollama">◉</div><div><strong>Ollama</strong><span>Lokale KI auf deinem Gerät</span></div><span className="coming-pill">BALD VERFÜGBAR</span></div></div><div className="setting-group"><h3>Datenschutz</h3><SettingToggle label="Kontext aus E-Mails verwenden" detail="Nachrichten erst nach deiner Bestätigung teilen" checked={true} /><div className="info-note"><ShieldCheck size={15} /> Deine E-Mails werden niemals automatisch an einen KI-Anbieter gesendet.</div></div></>}
+    {page === "notifications" && <><div className="setting-group"><h3>Neue Nachrichten</h3><SettingToggle label="Desktop-Benachrichtigungen" detail="Bei neuen E-Mails eine Mitteilung zeigen" checked={toggles.notifications} onClick={() => flip("notifications")} /><SettingToggle label="Nur wichtige Nachrichten" detail="Benachrichtigungen auf markierte Nachrichten begrenzen" checked={false} /></div><div className="setting-group"><h3>Ruhezeiten</h3><SettingSelect label="Nicht stören" detail="Benachrichtigungen in einem Zeitraum pausieren" value="Aus" /></div></>}
+    <div className="settings-save"><span><ShieldCheck size={14} /> Änderungen werden lokal gespeichert</span><button>Zurücksetzen</button></div></div></div></section>;
+}
+function SettingToggle({ label, detail, checked, onClick }: { label: string; detail: string; checked: boolean; onClick?: () => void }) { return <div className="setting-row"><div><strong>{label}</strong><span>{detail}</span></div><button className={`toggle ${checked ? "on" : ""}`} onClick={onClick} role="switch" aria-checked={checked}><span /></button></div>; }
+function SettingSelect({ label, detail, value }: { label: string; detail: string; value: string }) { return <div className="setting-row"><div><strong>{label}</strong><span>{detail}</span></div><button className="select-box">{value}<ChevronDown size={14} /></button></div>; }
+function ComposeModal({ onClose }: { onClose: () => void }) { return <div className="modal-scrim" onClick={onClose}><div className="compose-modal glass-panel" onClick={(event) => event.stopPropagation()}><div className="compose-head"><strong>Neue Nachricht</strong><button className="icon-button" onClick={onClose}><X size={17} /></button></div><div className="compose-fields"><div className="compose-field"><span>An</span><input autoFocus placeholder="Empfänger" /></div><div className="compose-field"><span>Betreff</span><input placeholder="Betreff hinzufügen" /></div></div><textarea placeholder="Schreibe deine Nachricht …" /><div className="compose-foot"><button className="send-button" onClick={onClose}><Send size={15} /> Senden</button><span>Demo-Modus · Versand nicht verfügbar</span><button className="icon-button" onClick={onClose}><Trash2 size={16} /></button></div></div></div>; }
