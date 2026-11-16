@@ -9,6 +9,7 @@ export default defineConfig({
     strictPort: true,
     port: 1420,
     host: "127.0.0.1",
+    proxy: { "/api": { target: process.env.SMART_MAIL_API ?? "http://127.0.0.1:3000", changeOrigin: false } },
     watch: { ignored: ["**/src-tauri/**"] },
   },
   envPrefix: ["VITE_", "TAURI_ENV_*"],
