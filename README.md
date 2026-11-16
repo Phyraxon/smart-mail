@@ -4,7 +4,7 @@ Smart Mail ist jetzt als plattformübergreifende Web-App mit installierbarer PWA
 
 ## Konten verbinden
 
-Die Konteneinstellungen enthalten einen Google-Anmeldefluss, einen separaten Gmail-OAuth-Fluss und ein IMAP/SMTP-Formular. IMAP und SMTP werden vor dem Speichern mit TLS getestet. Passwörter und OAuth-Tokens werden mit AES-256-GCM verschlüsselt im Backend-Datenspeicher abgelegt. Das Backend ist auf ein einziges freigeschaltetes Google-Konto ausgelegt.
+Die Konteneinstellungen enthalten eine Smart-Mail-Anmeldung mit eigenem Zugangsschlüssel sowie ein IMAP/SMTP-Formular. Für Gmail gibt es eine Voreinstellung mit `imap.gmail.com` und `smtp.gmail.com`. IMAP und SMTP werden vor dem Speichern mit TLS getestet. Mail-Passwörter werden mit AES-256-GCM verschlüsselt im Backend-Datenspeicher abgelegt.
 
 Die Hauptansicht zeigt weiterhin deutlich gekennzeichnete Beispieldaten. Das Verbinden eines Kontos schaltet die Live-Synchronisierung, Nachrichtenanzeige und den echten Versand noch nicht frei.
 
@@ -26,13 +26,13 @@ Copy-Item .env.example .env
 npm run server
 ```
 
-Erzeuge zwei verschiedene 32-Byte-Schlüssel und trage sie als `SESSION_KEY` und `ENCRYPTION_KEY` ein:
+Erzeuge zwei verschiedene 32-Byte-Schlüssel und trage sie als `SESSION_KEY` und `ENCRYPTION_KEY` ein. Setze außerdem ein separates zufälliges `APP_ACCESS_PASSWORD` mit mindestens 20 Zeichen. Verwende dafür nicht dein Google-App-Passwort:
 
 ```bash
 node -e "console.log(require('node:crypto').randomBytes(32).toString('base64'))"
 ```
 
-Für Google-Verbindung zusätzlich in Google Cloud einen OAuth-Client vom Typ „Webanwendung“ konfigurieren. Für lokale Entwicklung beide Weiterleitungs-URIs aus `.env.example` eintragen, die Gmail API aktivieren und deine Google-Adresse als Testnutzer eintragen. `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` und `ALLOWED_GOOGLE_EMAIL` in `.env` setzen. Für eine gehostete App beide OAuth-URIs auf deren HTTPS-Domain ändern.
+Für Gmail IMAP in Gmail unter „Weiterleitung und POP/IMAP“ IMAP aktivieren. Google-App-Passwörter setzen aktivierte Bestätigung in zwei Schritten voraus. Das App-Passwort kommt ins Smart-Mail-Kontoformular, nicht in `.env`.
 
 Produktionsdateien bauen:
 
@@ -57,7 +57,7 @@ GitHub Pages mit GitHub Free benötigt ein öffentliches Repository. Vor dem ers
 
 ```text
 src/                    React-Oberfläche, responsive Styles und Demo-Daten
-server/                 Google OAuth, IMAP/SMTP-Test und verschlüsselte Kontospeicherung
+server/                 Smart-Mail-Anmeldung, IMAP/SMTP-Test und verschlüsselte Kontospeicherung
 Dockerfile              Container für das Backend und den gebauten Web-Client
 public/                 PWA-Manifest, Service Worker und App-Icons
 .github/workflows/      Build- und GitHub-Pages-Deployment
