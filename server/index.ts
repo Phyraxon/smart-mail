@@ -5,6 +5,7 @@ import rateLimit from "@fastify/rate-limit";
 import fastifyStatic from "@fastify/static";
 import { ImapFlow } from "imapflow";
 import nodemailer from "nodemailer";
+import { simpleParser } from "mailparser";
 import { createCipheriv, createDecipheriv, createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { isIP } from "node:net";
@@ -57,6 +58,42 @@ app.post("/api/auth/login", { config: { rateLimit: { max: 5, timeWindow: "15 min
 app.get("/api/auth/me", async (request: any) => ({ user: request.session.get("user") ?? null }));
 app.post("/api/auth/logout", { preHandler: authenticated }, async (request: any) => { request.session.delete(); return { ok: true }; });
 app.get("/api/accounts", { preHandler: authenticated }, async () => ({ accounts: (await readStore()).accounts.map(({ id, provider, email, label, addedAt }) => ({ id, provider, email, label, addedAt })) }));
+app.get("/api/accounts/:id/messages", { preHandler: authenticated }, async (request: any, reply) => {
+  const { id } = request.params as { id: string }; const account = (await readStore()).accounts.find((item) => item.id === id);
+  if (!account) return reply.code(404).send({ error: "E-Mail-Konto nicht gefunden." });
+  let client: ImapFlow | undefined;
+  try {
+    const credentials = decrypt<z.infer<typeof imapSchema>>(account.encrypted);
+    client = new ImapFlow({ host: credentials.imapHost, port: credentials.imapPort, secure: credentials.imapPort === 993, doSTARTTLS: credentials.imapPort !== 993, auth: { user: credentials.username, pass: credentials.password }, logger: false, disableAutoIdle: true });
+    await client.connect(); const mailbox = await client.mailboxOpen("INBOX", { readOnly: true });
+    if (!mailbox.exists) return { messages: [] };
+    const start = Math.max(1, mailbox.exists - 24); const messages: Array<Record<string, unknown>> = [];
+    for await (const message of client.fetch(`${start}:*`, { uid: true, envelope: true, flags: true, internalDate: true, source: { maxLength: 200_000 } })) {
+      if (!message.source) continue;
+      const parsed = await simpleParser(message.source); const sender = parsed.from?.value[0]; const senderName = sender?.name || sender?.address || "Unbekannter Absender";
+      const timestamp = parsed.date ?? (message.internalDate instanceof Date ? message.internalDate : new Date());
+      let hue = 0; for (const char of senderName) hue = (hue * 31 + char.charCodeAt(0)) % 360;
+      const recipients = parsed.to ? (Array.isArray(parsed.to) ? parsed.to.flatMap((item) => item.value) : parsed.to.value) : [];
+      messages.push({ id: String(message.uid), sender: senderName, email: sender?.address ?? "", recipient: recipients.map((item) => item.address ?? item.name).filter(Boolean).join(", "), subject: parsed.subject ?? "(Kein Betreff)", preview: (parsed.text ?? "").replace(/\s+/g, " ").trim().slice(0, 180), body: (parsed.text ?? "Nachricht ohne Textinhalt.").slice(0, 20_000).split(/\n\s*\n/).filter(Boolean).slice(0, 30), time: timestamp.toLocaleString("de-DE", { dateStyle: "medium", timeStyle: "short" }), color: `hsl(${hue} 58% 72%)`, initials: senderName.split(/\s+/).slice(0, 2).map((part) => part[0]).join("").toUpperCase(), unread: !message.flags?.has("\\Seen"), starred: message.flags?.has("\\Flagged"), attachment: parsed.attachments[0]?.filename, folder: "inbox" });
+    }
+    return { messages: messages.reverse() };
+  } catch (error) { const message = error instanceof Error ? error.message : "IMAP-Postfach konnte nicht geladen werden."; request.log.warn({ err: error }, "Inbox fetch failed"); return reply.code(502).send({ error: `Postfach konnte nicht geladen werden: ${message.slice(0, 180)}` }); }
+  finally { await client?.logout().catch(() => {}); }
+});
+app.post("/api/accounts/:id/send", { preHandler: authenticated, config: { rateLimit: { max: 10, timeWindow: "15 minutes" } } }, async (request: any, reply) => {
+  const { id } = request.params as { id: string }; const account = (await readStore()).accounts.find((item) => item.id === id);
+  if (!account) return reply.code(404).send({ error: "E-Mail-Konto nicht gefunden." });
+  const parsed = z.object({ to: z.string().email().max(254), subject: z.string().max(998), text: z.string().min(1).max(50_000) }).safeParse(request.body);
+  if (!parsed.success) return reply.code(400).send({ error: parsed.error.issues[0]?.message ?? "Nachricht prüfen." });
+  let transporter: ReturnType<typeof nodemailer.createTransport> | undefined;
+  try {
+    const credentials = decrypt<z.infer<typeof imapSchema>>(account.encrypted); await assertPublicHost(credentials.smtpHost);
+    transporter = nodemailer.createTransport({ host: credentials.smtpHost, port: credentials.smtpPort, secure: credentials.smtpPort === 465, requireTLS: credentials.smtpPort !== 465, auth: { user: credentials.username, pass: credentials.password }, tls: { rejectUnauthorized: true }, connectionTimeout: 12_000, greetingTimeout: 12_000, socketTimeout: 12_000 });
+    const sent = await transporter.sendMail({ from: account.email, to: parsed.data.to, subject: parsed.data.subject, text: parsed.data.text });
+    return { ok: true, messageId: sent.messageId };
+  } catch (error) { const message = error instanceof Error ? error.message : "Nachricht konnte nicht gesendet werden."; request.log.warn({ err: error }, "SMTP send failed"); return reply.code(502).send({ error: `Versand fehlgeschlagen: ${message.slice(0, 180)}` }); }
+  finally { transporter?.close(); }
+});
 app.post("/api/accounts/imap", { preHandler: authenticated }, async (request: any, reply) => {
   const parsed = imapSchema.safeParse(request.body); if (!parsed.success) return reply.code(400).send({ error: parsed.error.issues[0]?.message ?? "Eingaben prüfen." });
   const input = parsed.data;
