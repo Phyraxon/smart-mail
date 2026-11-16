@@ -32,7 +32,7 @@ Erzeuge zwei verschiedene 32-Byte-Schlüssel und trage sie als `SESSION_KEY` und
 node -e "console.log(require('node:crypto').randomBytes(32).toString('base64'))"
 ```
 
-Für Gmail IMAP in Gmail unter „Weiterleitung und POP/IMAP“ IMAP aktivieren. Google-App-Passwörter setzen aktivierte Bestätigung in zwei Schritten voraus. Das App-Passwort kommt ins Smart-Mail-Kontoformular, nicht in `.env`.
+Bei privaten Gmail-Konten ist IMAP standardmäßig aktiv. Google-App-Passwörter setzen aktivierte Bestätigung in zwei Schritten voraus. Das App-Passwort kommt ins Smart-Mail-Kontoformular, nicht in `.env`. Google empfiehlt, wenn möglich, „Über Google anmelden“ zu verwenden.
 
 Produktionsdateien bauen:
 
